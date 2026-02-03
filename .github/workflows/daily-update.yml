@@ -1,0 +1,26 @@
+name: Daily Chapter Update
+
+on:
+  schedule:
+    # 每天晚上 8:00 (UTC+8) 更新，即 UTC 12:00
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-chapter:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      
+    - name: Update README with latest chapter
+      run: |
+        echo "更新章节列表..."
+        # 这里可以添加自动更新逻辑
+        
+    - name: Commit and push if changed
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git commit -m "Daily chapter update: $(date +%Y-%m-%d)" || exit 0
+        git push
