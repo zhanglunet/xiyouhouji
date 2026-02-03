@@ -5,22 +5,52 @@ on:
     # 每天晚上 8:00 (UTC+8) 更新，即 UTC 12:00
     - cron: '0 12 * * *'
   workflow_dispatch:
+    # 允许手动触发
 
 jobs:
   update-chapter:
     runs-on: ubuntu-latest
+    
     steps:
-    - uses: actions/checkout@v3
-      
-    - name: Update README with latest chapter
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
       run: |
-        echo "更新章节列表..."
-        # 这里可以添加自动更新逻辑
-        
-    - name: Commit and push if changed
+        pip install pillow imageio imageio-ffmpeg numpy
+    
+    - name: Generate new chapter
+      run: |
+        cd scripts
+        python generate_chapter.py >> update.log 2>&1 || echo "No chapter to update today"
+    
+    - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add -A
-        git commit -m "Daily chapter update: $(date +%Y-%m-%d)" || exit 0
+        git commit -m "$(date +'Update: %Y-%m-%d %H:%M') - Add new chapter" || exit 0
         git push
+    
+    - name: Create Release (weekly)
+      if: github.event.schedule == '0 12 * * 0'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v$(date +'%Y.%m.%d')
+        release_name: Weekly Release $(date +'%Y-%m-%d')
+        body: |
+          本周更新内容：
+          - 新增章节
+          - 修复问题
+          - 优化内容
+        draft: false
+        prerelease: false
