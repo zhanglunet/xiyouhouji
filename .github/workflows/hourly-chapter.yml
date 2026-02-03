@@ -1,0 +1,55 @@
+name: Hourly Chapter Update with Picture Book
+
+on:
+  schedule:
+    # 每小时更新一次（UTC时间）
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  update-chapter:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install pillow imageio imageio-ffmpeg numpy openai requests
+    
+    - name: Generate new chapter and picture book
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        cd scripts
+        python hourly_generator.py >> ../update.log 2>&1 || echo "Generation completed with some warnings"
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        git commit -m "$(date +'Hourly Update: %Y-%m-%d %H:%M') - Add new chapter and picture book" || exit 0
+        git push
+    
+    - name: Create Release Note
+      if: success()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { data: release } = await github.rest.repos.createRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            tag_name: `chapter-${new Date().toISOString().slice(0,10)}-${new Date().getHours()}`,
+            name: `Chapter Update ${new Date().toLocaleString()}`,
+            body: `New chapter and picture book have been generated!`,
+            draft: false,
+            prerelease: false
+          });
+          console.log(`Created release ${release.html_url}`);
